@@ -234,6 +234,19 @@
                         </div>
 
                         <div class="field-pair">
+                            <label class="nocheck clearfix" for="episode_title_sep_type">
+                                <span class="component-title">Episode Title Separator Style</span>
+                                <span class="component-desc">
+                                    <select name="episode_title_sep_type" id="episode_title_sep_type">
+                                    #for ($i, $ex) in enumerate($config.episode_title_sep_type_text):
+                                    <option value="$i" #if $i == int($sickbeard.EPISODE_TITLE_SEP_TYPE) then "selected=\"selected\"" else ""#>$ex</option>
+                                    #end for
+                                    </select>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="field-pair">
                             <label class="nocheck clearfix" for="naming_ep_type">
                                 <span class="component-title">Number Style</span>
                                 <span class="component-desc">
