@@ -392,11 +392,17 @@ def listMediaFiles(dir):
     return files
 
 def copyFile(srcFile, destFile):
-    ek.ek(shutil.copyfile, srcFile, destFile)
-    try:
-        ek.ek(shutil.copymode, srcFile, destFile)
-    except OSError:
-        pass
+    srcDev = os.stat(srcFile).st_dev
+    destDev = os.stat(os.path.split(destFile)[0]).st_dev
+    
+    if srcDev == destDev:
+        ek.ek(os.link, srcFile, destFile)
+    else:
+        ek.ek(shutil.copyfile, srcFile, destFile)
+        try:
+            ek.ek(shutil.copymode, srcFile, destFile)
+        except OSError:
+            pass
 
 def moveFile(srcFile, destFile):
     try:
