@@ -238,7 +238,7 @@
                                 <span class="component-title">Episode Title Separator Style</span>
                                 <span class="component-desc">
                                     <select name="episode_title_sep_type" id="episode_title_sep_type">
-                                    #for ($i, $ex) in enumerate($config.naming_sep_type_text):
+                                    #for ($i, $ex) in enumerate($config.episode_title_sep_type_text):
                                     <option value="$i" #if $i == int($sickbeard.EPISODE_TITLE_SEP_TYPE) then "selected=\"selected\"" else ""#>$ex</option>
                                     #end for
                                     </select>
