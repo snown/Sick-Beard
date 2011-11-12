@@ -920,6 +920,8 @@ class ConfigPostProcessing:
             sep_type = sickbeard.NAMING_SEP_TYPE
         else:
             sep_type = int(sep_type)
+        
+        episode_sep_type = sickbeard.EPISODE_TITLE_SEP_TYPE
 
         class TVShow():
             def __init__(self):
@@ -947,7 +949,7 @@ class ConfigPostProcessing:
             ep.relatedEps.append(secondEp)
 
         # get the name
-        name = ep.prettyName(show_name, ep_type, multi_ep_type, ep_name, sep_type, use_periods, quality)
+        name = ep.prettyName(show_name, ep_type, multi_ep_type, ep_name, sep_type, use_periods, quality, episode_sep_type)
 
         return name
 
