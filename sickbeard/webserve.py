@@ -855,6 +855,7 @@ class ConfigPostProcessing:
         sickbeard.NAMING_EP_TYPE = int(naming_ep_type)
         sickbeard.NAMING_MULTI_EP_TYPE = int(naming_multi_ep_type)
         sickbeard.NAMING_SEP_TYPE = int(naming_sep_type)
+        sickbeard.EPISODE_SEP_TYPE = int(episode_sep_type)
 
         sickbeard.USE_BANNER = use_banner
 
@@ -921,7 +922,7 @@ class ConfigPostProcessing:
         else:
             sep_type = int(sep_type)
         
-        episode_sep_type = sickbeard.EPISODE_TITLE_SEP_TYPE
+        episode_sep_type = 1
 
         class TVShow():
             def __init__(self):
