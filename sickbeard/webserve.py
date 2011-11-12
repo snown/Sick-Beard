@@ -873,7 +873,7 @@ class ConfigPostProcessing:
 
     @cherrypy.expose
     def testNaming(self, show_name=None, ep_type=None, multi_ep_type=None, ep_name=None,
-                   sep_type=None, use_periods=None, quality=None, whichTest="single"):
+                   sep_type=None, episode_sep_type=None, use_periods=None, quality=None, whichTest="single"):
 
         if show_name == None:
             show_name = sickbeard.NAMING_SHOW_NAME
@@ -922,7 +922,10 @@ class ConfigPostProcessing:
         else:
             sep_type = int(sep_type)
         
-        episode_sep_type = sickbeard.EPISODE_TITLE_SEP_TYPE
+        if episode_sep_type == None:
+            episode_sep_type = sickbeard.EPISODE_TITLE_SEP_TYPE
+        else:
+            episode_sep_type = int(episode_sep_type)
 
         class TVShow():
             def __init__(self):
