@@ -1352,7 +1352,7 @@ class TVEpisode(object):
         return self.show.getOverview(self.status)
 
     def prettyName (self, naming_show_name=None, naming_ep_type=None, naming_multi_ep_type=None,
-                    naming_ep_name=None, naming_sep_type=None, naming_use_periods=None, naming_quality=None):
+                    naming_ep_name=None, naming_sep_type=None, naming_use_periods=None, naming_quality=None, episode_title_sep_type=None):
 
         regex = "(.*) \(\d\)"
 
@@ -1404,6 +1404,8 @@ class TVEpisode(object):
 
         if naming_sep_type == None:
             naming_sep_type = sickbeard.NAMING_SEP_TYPE
+        
+        episode_title_sep_type = sickbeard.EPISODE_TITLE_SEP_TYPE
 
         if naming_use_periods == None:
             naming_use_periods = sickbeard.NAMING_USE_PERIODS
@@ -1425,7 +1427,10 @@ class TVEpisode(object):
             goodEpString += config.naming_multi_ep_type[naming_multi_ep_type][naming_ep_type] % {'seasonnumber': relEp.season, 'episodenumber': relEp.episode}
 
         if goodName != '':
-            goodName = config.naming_sep_type[naming_sep_type] + goodName
+            if episode_title_sep_type == 0:
+                goodName = config.naming_sep_type[naming_sep_type] + goodName
+            else:
+                goodName = config.episode_title_sep_type[episode_title_sep_type] + goodName
 
         finalName = ""
 
