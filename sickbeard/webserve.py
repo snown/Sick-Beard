@@ -774,7 +774,7 @@ class ConfigPostProcessing:
     @cherrypy.expose
     def savePostProcessing(self, season_folders_format=None, naming_show_name=None, naming_ep_type=None,
                     naming_multi_ep_type=None, naming_ep_name=None, naming_use_periods=None,
-                    naming_sep_type=None, naming_quality=None, naming_dates=None,
+                    naming_sep_type=None, episode_title_sep_type=None, naming_quality=None, naming_dates=None,
                     xbmc_data=None, mediabrowser_data=None, sony_ps3_data=None, wdtv_data=None, tivo_data=None,
                     use_banner=None, keep_processed_dir=None, process_automatically=None, rename_episodes=None,
                     move_associated_files=None, tv_download_dir=None):
@@ -855,7 +855,7 @@ class ConfigPostProcessing:
         sickbeard.NAMING_EP_TYPE = int(naming_ep_type)
         sickbeard.NAMING_MULTI_EP_TYPE = int(naming_multi_ep_type)
         sickbeard.NAMING_SEP_TYPE = int(naming_sep_type)
-        sickbeard.EPISODE_SEP_TYPE = int(episode_sep_type)
+        sickbeard.EPISODE_TITLE_SEP_TYPE = int(episode_title_sep_type)
 
         sickbeard.USE_BANNER = use_banner
 
@@ -922,7 +922,7 @@ class ConfigPostProcessing:
         else:
             sep_type = int(sep_type)
         
-        episode_sep_type = 1
+        episode_sep_type = sickbeard.EPISODE_TITLE_SEP_TYPE
 
         class TVShow():
             def __init__(self):
