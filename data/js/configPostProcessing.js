@@ -9,7 +9,7 @@ $(document).ready(function(){
                   'use_periods': $('#naming_use_periods').prop('checked')?"1":"0",
                   'quality': $('#naming_quality').prop('checked')?"1":"0",
                   'sep_type': $('#naming_sep_type :selected').val(),
-                  'episode_sep_type': $('episode_title_sep_type :selected').val(),
+                  'episode_sep_type': $('#episode_title_sep_type :selected').val(),
                   'whichTest': 'single'
                   }
         
@@ -57,6 +57,10 @@ $(document).ready(function(){
   $('#naming_sep_type').change(function(){
         $(this).setExampleText();
     });  
+
+    $('#episode_title_sep_type').change(function(){
+          $(this).setExampleText();
+      });  
 
     // -- start of metadata options div toggle code --
     $('#metadataType').change(function(){
