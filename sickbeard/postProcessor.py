@@ -594,6 +594,9 @@ class PostProcessor(object):
         
         self._log(u"Processing "+self.file_path+" ("+str(self.nzb_name)+")")
         
+        if os.path.isdir( self.file_path ):
+            self._log(u"File "+self.file_path+" seems to be a directory")
+            return False
         # reset per-file stuff
         self.in_history = False
         
@@ -714,7 +717,12 @@ class PostProcessor(object):
         # do the library update for synoindex
         notifiers.synoindex_notifier.update_library(ep_obj)
 
-        # run extra_scripts
+        # do the library update for trakt
+        notifiers.trakt_notifier.update_library(ep_obj)
+        
+        # do the library update for pyTivo
+        notifiers.pytivo_notifier.update_library(ep_obj)
+        
         self._run_extra_scripts(ep_obj)
 
         return True
