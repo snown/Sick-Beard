@@ -393,13 +393,19 @@ def listMediaFiles(dir):
 
     return files
 
-def copyFile(srcFile, destFile):
+def hardLinkFile(srcFile, destFile):
     srcDev = os.stat(srcFile).st_dev
     destDev = os.stat(os.path.split(destFile)[0]).st_dev
     
-    if srcDev == destDev:
-        ek.ek(os.link, srcFile, destFile)
+    if sickbeard.TRY_HARD_LINK == 0 or srcDev != destDev:
+        return False
     else:
+         ek.ek(os.link, srcFile, destFile)
+
+    return True
+
+def copyFile(srcFile, destFile):
+    if not hardLinkFile(srcFile, destFile):
         ek.ek(shutil.copyfile, srcFile, destFile)
         try:
             ek.ek(shutil.copymode, srcFile, destFile)
@@ -407,12 +413,15 @@ def copyFile(srcFile, destFile):
             pass
 
 def moveFile(srcFile, destFile):
-    try:
-        ek.ek(os.rename, srcFile, destFile)
-        fixSetGroupID(destFile)
-    except OSError:
-        copyFile(srcFile, destFile)
+    if hardLinkFile(srcFile, destFile):
         ek.ek(os.unlink, srcFile)
+    else:
+        try:
+            ek.ek(os.rename, srcFile, destFile)
+            fixSetGroupID(destFile)
+        except OSError:
+            copyFile(srcFile, destFile)
+            ek.ek(os.unlink, srcFile)
 
 def rename_file(old_path, new_name):
 

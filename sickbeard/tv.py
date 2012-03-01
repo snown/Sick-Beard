@@ -1404,7 +1404,7 @@ class TVEpisode(object):
 
         if naming_sep_type == None:
             naming_sep_type = sickbeard.NAMING_SEP_TYPE
-        
+
         if episode_title_sep_type == None:
             episode_title_sep_type = sickbeard.EPISODE_TITLE_SEP_TYPE
 

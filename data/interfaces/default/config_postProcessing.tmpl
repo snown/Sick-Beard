@@ -71,6 +71,14 @@
                             </label>
                         </div>
 
+						<div class="field-pair">
+						    <input type="checkbox" name="try_hard_link" id="try_hard_link" #if $sickbeard.TRY_HARD_LINK == True then "checked=\"checked\"" else ""# />
+						    <label class="clearfix" for="try_hard_link">
+						        <span class="component-title">Try Hard Link</span>
+						        <span class="component-desc">Try to Hard Link if file source and destination are on the same disk?</span>
+						    </label>
+						</div>
+
                         <div class="field-pair">
                             <input type="checkbox" name="rename_episodes" id="rename_episodes" #if $sickbeard.RENAME_EPISODES == True then "checked=\"checked\"" else ""# />
                             <label class="clearfix" for="rename_episodes">
@@ -233,18 +241,18 @@
                             </label>
                         </div>
 
-                        <div class="field-pair">
-                            <label class="nocheck clearfix" for="episode_title_sep_type">
-                                <span class="component-title">Episode Title Separator Style</span>
-                                <span class="component-desc">
-                                    <select name="episode_title_sep_type" id="episode_title_sep_type">
-                                    #for ($i, $ex) in enumerate($config.episode_title_sep_type_text):
-                                    <option value="$i" #if $i == int($sickbeard.EPISODE_TITLE_SEP_TYPE) then "selected=\"selected\"" else ""#>$ex</option>
-                                    #end for
-                                    </select>
-                                </span>
-                            </label>
-                        </div>
+						<div class="field-pair">
+							<label class="nocheck clearfix" for="episode_title_sep_type">
+								<span class="component-title">Episode Title Separator Style</span>
+								<span class="component-desc">
+									<select name="episode_title_sep_type" id="episode_title_sep_type">
+										#for ($i, $ex) in enumerate($config.episode_title_sep_type_text):
+										<option value="$i" #if $i == int($sickbeard.EPISODE_TITLE_SEP_TYPE) then "selected=\"selected\"" else ""#>$ex</option>
+										 #end for
+									</select>
+								</span>
+							</label>
+						</div>
 
                         <div class="field-pair">
                             <label class="nocheck clearfix" for="naming_ep_type">

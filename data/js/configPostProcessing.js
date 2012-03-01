@@ -57,7 +57,7 @@ $(document).ready(function(){
   $('#naming_sep_type').change(function(){
         $(this).setExampleText();
     });  
-
+    
     $('#episode_title_sep_type').change(function(){
           $(this).setExampleText();
       });  
