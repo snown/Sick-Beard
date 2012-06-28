@@ -26,6 +26,7 @@ import re
 import threading
 import datetime
 import random
+import binascii
 
 from Cheetah.Template import Template
 import cherrypy.lib
@@ -41,7 +42,7 @@ from sickbeard import search_queue
 from sickbeard import image_cache
 
 from sickbeard.providers import newznab
-from sickbeard.common import Quality, Overview, statusStrings
+from sickbeard.common import Quality, Overview, statusStrings, qualityPresets, qualityPresetStrings
 from sickbeard.common import SNATCHED, DOWNLOADED, SKIPPED, UNAIRED, IGNORED, ARCHIVED, WANTED
 from sickbeard.exceptions import ex
 from sickbeard.webapi import Api
@@ -66,8 +67,23 @@ class PageTemplate (Template):
         self.sbHttpPort = sickbeard.WEB_PORT
         self.sbHttpsPort = sickbeard.WEB_PORT
         self.sbHttpsEnabled = sickbeard.ENABLE_HTTPS
-        self.sbHost = re.match("[^:]+", cherrypy.request.headers['Host'], re.X|re.M|re.S).group(0)
+        if cherrypy.request.headers['Host'][0] == '[':
+            self.sbHost = re.match("^\[.*\]", cherrypy.request.headers['Host'], re.X|re.M|re.S).group(0)
+        else:
+            self.sbHost = re.match("^[^:]+", cherrypy.request.headers['Host'], re.X|re.M|re.S).group(0)
         self.projectHomePage = "http://code.google.com/p/sickbeard/"
+
+        if sickbeard.NZBS and sickbeard.NZBS_UID and sickbeard.NZBS_HASH:
+            logger.log(u"NZBs.org has been replaced, please check the config to configure the new provider!", logger.ERROR)
+            ui.notifications.error("NZBs.org Config Update", "NZBs.org has a new site. Please <a href=\""+sickbeard.WEB_ROOT+"/config/providers\">update your config</a> with the api key from <a href=\"http://beta.nzbs.org/login\">http://beta.nzbs.org</a> and then disable the old NZBs.org provider.")
+
+        if "X-Forwarded-Host" in cherrypy.request.headers:
+            self.sbHost = cherrypy.request.headers['X-Forwarded-Host']
+        if "X-Forwarded-Port" in cherrypy.request.headers:
+            self.sbHttpPort = cherrypy.request.headers['X-Forwarded-Port']
+            self.sbHttpsPort = self.sbHttpPort
+        if "X-Forwarded-Proto" in cherrypy.request.headers:
+            self.sbHttpsEnabled = True if cherrypy.request.headers['X-Forwarded-Proto'] == 'https' else False
 
         logPageTitle = 'Logs &amp; Errors'
         if len(classes.ErrorViewer.errors):
@@ -553,19 +569,15 @@ class Manage:
 class History:
 
     @cherrypy.expose
-    def index(self, limit=100):
+    def index(self):
 
         myDB = db.DBConnection()
 
 #        sqlResults = myDB.select("SELECT h.*, show_name, name FROM history h, tv_shows s, tv_episodes e WHERE h.showid=s.tvdb_id AND h.showid=e.showid AND h.season=e.season AND h.episode=e.episode ORDER BY date DESC LIMIT "+str(numPerPage*(p-1))+", "+str(numPerPage))
-        if limit == "0":
-            sqlResults = myDB.select("SELECT h.*, show_name FROM history h, tv_shows s WHERE h.showid=s.tvdb_id ORDER BY date DESC")
-        else:
-            sqlResults = myDB.select("SELECT h.*, show_name FROM history h, tv_shows s WHERE h.showid=s.tvdb_id ORDER BY date DESC LIMIT ?", [limit])
+        sqlResults = myDB.select("SELECT h.*, show_name FROM history h, tv_shows s WHERE h.showid=s.tvdb_id ORDER BY date DESC")
 
         t = PageTemplate(file="history.tmpl")
         t.historyResults = sqlResults
-        t.limit = limit
         t.submenu = [
             { 'title': 'Clear History', 'path': 'history/clearHistory' },
             { 'title': 'Trim History',  'path': 'history/trimHistory'  },
@@ -1086,11 +1098,10 @@ class ConfigProviders:
 
 
     @cherrypy.expose
-    def saveProviders(self, nzbs_org_uid=None, nzbs_org_hash=None,
-                      nzbmatrix_username=None, nzbmatrix_apikey=None,
+    def saveProviders(self, nzbmatrix_username=None, nzbmatrix_apikey=None,
                       nzbs_r_us_uid=None, nzbs_r_us_hash=None, newznab_string=None,
                       tvtorrents_digest=None, tvtorrents_hash=None,
- 					  btn_user_id=None, btn_auth_token=None, btn_passkey=None, btn_authkey=None,
+ 					  btn_api_key=None,
                       newzbin_username=None, newzbin_password=None,
                       provider_order=None):
 
@@ -1125,7 +1136,6 @@ class ConfigProviders:
 
             finishedNames.append(curID)
 
-
         # delete anything that is missing
         for curProvider in sickbeard.newznabProviderList:
             if curProvider.getID() not in finishedNames:
@@ -1138,10 +1148,10 @@ class ConfigProviders:
 
             provider_list.append(curProvider)
 
-            if curProvider == 'nzbs_org':
-                sickbeard.NZBS = curEnabled
-            elif curProvider == 'nzbs_r_us':
+            if curProvider == 'nzbs_r_us':
                 sickbeard.NZBSRUS = curEnabled
+            elif curProvider == 'nzbs_org_old':
+                sickbeard.NZBS = curEnabled
             elif curProvider == 'nzbmatrix':
                 sickbeard.NZBMATRIX = curEnabled
             elif curProvider == 'newzbin':
@@ -1164,13 +1174,7 @@ class ConfigProviders:
         sickbeard.TVTORRENTS_DIGEST = tvtorrents_digest.strip()
         sickbeard.TVTORRENTS_HASH = tvtorrents_hash.strip()
 
-        sickbeard.BTN_USER_ID = btn_user_id.strip()
-        sickbeard.BTN_AUTH_TOKEN = btn_auth_token.strip()
-        sickbeard.BTN_PASSKEY = btn_passkey.strip()
-        sickbeard.BTN_AUTHKEY = btn_authkey.strip()
-
-        sickbeard.NZBS_UID = nzbs_org_uid.strip()
-        sickbeard.NZBS_HASH = nzbs_org_hash.strip()
+        sickbeard.BTN_API_KEY = btn_api_key.strip()
 
         sickbeard.NZBSRUS_UID = nzbs_r_us_uid.strip()
         sickbeard.NZBSRUS_HASH = nzbs_r_us_hash.strip()
@@ -1213,6 +1217,7 @@ class ConfigNotifications:
                           use_twitter=None, twitter_notify_onsnatch=None, twitter_notify_ondownload=None, 
                           use_notifo=None, notifo_notify_onsnatch=None, notifo_notify_ondownload=None, notifo_username=None, notifo_apisecret=None,
                           use_boxcar=None, boxcar_notify_onsnatch=None, boxcar_notify_ondownload=None, boxcar_username=None,
+                          use_pushover=None, pushover_notify_onsnatch=None, pushover_notify_ondownload=None, pushover_userkey=None,
                           use_libnotify=None, libnotify_notify_onsnatch=None, libnotify_notify_ondownload=None,
                           use_nmj=None, nmj_host=None, nmj_database=None, nmj_mount=None, use_synoindex=None,
                           use_trakt=None, trakt_username=None, trakt_password=None, trakt_api=None,
@@ -1338,6 +1343,20 @@ class ConfigNotifications:
         else:
             use_boxcar = 0
 
+        if pushover_notify_onsnatch == "on":
+            pushover_notify_onsnatch = 1
+        else:
+            pushover_notify_onsnatch = 0
+
+        if pushover_notify_ondownload == "on":
+            pushover_notify_ondownload = 1
+        else:
+            pushover_notify_ondownload = 0
+        if use_pushover == "on":
+            use_pushover = 1
+        else:
+            use_pushover = 0
+
         if use_nmj == "on":
             use_nmj = 1
         else:
@@ -1432,6 +1451,11 @@ class ConfigNotifications:
         sickbeard.BOXCAR_NOTIFY_ONSNATCH = boxcar_notify_onsnatch
         sickbeard.BOXCAR_NOTIFY_ONDOWNLOAD = boxcar_notify_ondownload
         sickbeard.BOXCAR_USERNAME = boxcar_username
+
+        sickbeard.USE_PUSHOVER = use_pushover
+        sickbeard.PUSHOVER_NOTIFY_ONSNATCH = pushover_notify_onsnatch
+        sickbeard.PUSHOVER_NOTIFY_ONDOWNLOAD = pushover_notify_ondownload
+        sickbeard.PUSHOVER_USERKEY = pushover_userkey
 
         sickbeard.USE_LIBNOTIFY = use_libnotify == "on"
         sickbeard.LIBNOTIFY_NOTIFY_ONSNATCH = libnotify_notify_onsnatch == "on"
@@ -1565,26 +1589,43 @@ class NewHomeAddShows:
                 lang = "en"
 
         baseURL = "http://thetvdb.com/api/GetSeries.php?"
+        nameUTF8 = name.encode('utf-8')
 
-        params = {'seriesname': name.encode('utf-8'),
+        # Use each word in the show's name as a possible search term
+        keywords = nameUTF8.split(' ')
+
+        # Insert the whole show's name as the first search term so best results are first
+        # ex: keywords = ['Some Show Name', 'Some', 'Show', 'Name']
+        keywords.insert(0, nameUTF8)
+
+        # Query the TVDB for each search term and build the list of results
+        results = []
+        for searchTerm in keywords:
+            params = {'seriesname': searchTerm,
                   'language': lang}
 
-        finalURL = baseURL + urllib.urlencode(params)
+            finalURL = baseURL + urllib.urlencode(params)
 
-        urlData = helpers.getURL(finalURL)
+            urlData = helpers.getURL(finalURL)
 
-        try:
-            seriesXML = etree.ElementTree(etree.XML(urlData))
-        except Exception, e:
-            logger.log(u"Unable to parse XML for some reason: "+ex(e)+" from XML: "+urlData, logger.ERROR)
-            return ''
+            try:
+                seriesXML = etree.ElementTree(etree.XML(urlData))
+                series = seriesXML.getiterator('Series')
 
-        series = seriesXML.getiterator('Series')
+            except Exception, e:
+                # use finalURL in log, because urlData can be too much information
+                logger.log(u"Unable to parse XML for some reason: "+ex(e)+" from XML: "+finalURL, logger.ERROR)
+                series = ''
 
-        results = []
-
-        for curSeries in series:
-            results.append((int(curSeries.findtext('seriesid')), curSeries.findtext('SeriesName'), curSeries.findtext('FirstAired')))
+            # add each result to our list
+            for curSeries in series:
+                tvdb_id = int(curSeries.findtext('seriesid'))
+                
+                # don't add duplicates
+                if tvdb_id in [x[0] for x in results]:
+                    continue
+                
+                results.append((tvdb_id, curSeries.findtext('SeriesName'), curSeries.findtext('FirstAired')))
 
         lang_id = tvdb_api.Tvdb().config['langabbv_to_id'][lang]
 
@@ -1752,16 +1793,19 @@ class NewHomeAddShows:
         # blanket policy - if the dir exists you should have used "add existing show" numbnuts
         if ek.ek(os.path.isdir, show_dir) and not fullShowPath:
             ui.notifications.error("Unable to add show", "Folder "+show_dir+" exists already")
-            redirect('/home')
+            redirect('/home/addShows/existingShows')
         
-        # create the dir and make sure it worked
-        dir_exists = helpers.makeDir(show_dir)
-        if not dir_exists:
-            logger.log(u"Unable to create the folder "+show_dir+", can't add the show", logger.ERROR)
-            ui.notifications.error("Unable to add show", "Unable to create the folder "+show_dir+", can't add the show")
-            redirect("/home")
+        # don't create show dir if config says not to
+        if sickbeard.ADD_SHOWS_WO_DIR:
+            logger.log(u"Skipping initial creation of "+show_dir+" due to config.ini setting")
         else:
-            helpers.chmodAsParent(show_dir)
+            dir_exists = helpers.makeDir(show_dir)
+            if not dir_exists:
+                logger.log(u"Unable to create the folder "+show_dir+", can't add the show", logger.ERROR)
+                ui.notifications.error("Unable to add show", "Unable to create the folder "+show_dir+", can't add the show")
+                redirect("/home")
+            else:
+                helpers.chmodAsParent(show_dir)
 
         # prepare the inputs for passing along
         if seasonFolders == "on":
@@ -1948,6 +1992,126 @@ class ErrorLogs:
 class Home:
 
     @cherrypy.expose
+    def json_show_list_crc(self):
+        
+        crc_list = []
+        
+        for cur_show in sickbeard.showList:
+            crc_list.append(cur_show.createCRC())
+        
+        crc_list += [x.createCRC() for x in sickbeard.showQueueScheduler.action.loadingShowList] #@UndefinedVariable
+
+        # get a list of episodes grouped by show so we can get stats from them
+        myDB = db.DBConnection()
+        today = str(datetime.date.today().toordinal())
+        downloadedEps = myDB.select("SELECT showid, COUNT(*) FROM tv_episodes WHERE (status IN ("+",".join([str(x) for x in Quality.DOWNLOADED + [ARCHIVED]])+") OR (status IN ("+",".join([str(x) for x in Quality.SNATCHED + Quality.SNATCHED_PROPER])+") AND location != '')) AND season != 0 and episode != 0 AND airdate <= "+today+" GROUP BY showid")
+        allEps = myDB.select("SELECT showid, COUNT(*) FROM tv_episodes WHERE season != 0 and episode != 0 AND (airdate != 1 OR status IN ("+",".join([str(x) for x in (Quality.DOWNLOADED + Quality.SNATCHED + Quality.SNATCHED_PROPER) + [ARCHIVED]])+")) AND airdate <= "+today+" AND status != "+str(IGNORED)+" GROUP BY showid")
+
+        crc_list += [str(x[0])+":"+str(x[1]) for x in downloadedEps + allEps]
+    
+        return json.dumps({'crc': "%08x" % (binascii.crc32(":".join(crc_list)) & 0xffffffff)})
+
+    @cherrypy.expose
+    def json_show_list(self, _=None):
+        
+        result = []
+        
+        myDB = db.DBConnection()
+        today = str(datetime.date.today().toordinal())
+
+        # get a list of episodes grouped by show so we can get stats from them
+        downloadedEps = myDB.select("SELECT showid, COUNT(*) FROM tv_episodes WHERE (status IN ("+",".join([str(x) for x in Quality.DOWNLOADED + [ARCHIVED]])+") OR (status IN ("+",".join([str(x) for x in Quality.SNATCHED + Quality.SNATCHED_PROPER])+") AND location != '')) AND season != 0 and episode != 0 AND airdate <= "+today+" GROUP BY showid")
+        allEps = myDB.select("SELECT showid, COUNT(*) FROM tv_episodes WHERE season != 0 and episode != 0 AND (airdate != 1 OR status IN ("+",".join([str(x) for x in (Quality.DOWNLOADED + Quality.SNATCHED + Quality.SNATCHED_PROPER) + [ARCHIVED]])+")) AND airdate <= "+today+" AND status != "+str(IGNORED)+" GROUP BY showid")
+
+        # add any shows which are still loading
+        for cur_loading_show in sickbeard.showQueueScheduler.action.loadingShowList: #@UndefinedVariable
+
+            # if a show's in this state we don't know enough about it to do anything useful
+            if cur_loading_show.show != None and cur_loading_show.show in sickbeard.showList:
+                continue
+
+            cur_show_json = {}
+
+            # if there's no TVShow object then we don't have much info
+            if cur_loading_show.show == None:
+                show_name = "Loading... ("+cur_loading_show.show_name+")"
+                tvdb_id = 0
+                quality_string = ''
+            else:
+                show_name = cur_loading_show.show.name
+                tvdb_id = cur_loading_show.show.tvdbid
+    
+                # make a string out of the quality
+                if cur_loading_show.quality in qualityPresets:
+                    quality_string = qualityPresetStrings[cur_loading_show.quality]
+                else:
+                    quality_string = "Custom"
+    
+            # put together the json object
+            cur_show_json['next_airdate'] = '(loading)'
+            cur_show_json['tvdb_id'] = tvdb_id
+            cur_show_json['name'] = show_name
+            cur_show_json['network'] = ''
+            cur_show_json['quality_string'] = quality_string
+            cur_show_json['active'] = True
+            cur_show_json['status'] = ''
+            cur_show_json['num_eps'] = 0
+            cur_show_json['num_downloaded'] = 0
+            cur_show_json['percent_downloaded'] = 0
+        
+            result.append(cur_show_json)
+    
+        for cur_show in sickbeard.showList:
+            cur_show_json = {}
+            
+            # figure out the next airdate
+            next_eps = cur_show.nextEpisode()
+            if next_eps and next_eps[0].airdate:
+                next_airdate = str(next_eps[0].airdate)
+            else:
+                next_airdate = ""
+            
+            # make a string out of the quality
+            if cur_show.quality in qualityPresets:
+                quality_string = qualityPresetStrings[cur_show.quality]
+            else:
+                quality_string = "Custom"
+                
+            # get the episode counts for this show            
+            curShowDownloads = [x[1] for x in downloadedEps if int(x[0]) == cur_show.tvdbid]
+            curShowAll = [x[1] for x in allEps if int(x[0]) == cur_show.tvdbid]
+
+            if not curShowAll:
+                curShowAll = [0]
+            if not curShowDownloads:
+                curShowDownloads = [0]
+            
+            num_eps = curShowAll[0]
+            num_downloaded = curShowDownloads[0]
+
+            # get the percent downloaded
+            if num_downloaded == 0:
+                percent_downloaded = 0
+            else:
+                percent_downloaded = int(100.0 * float(num_downloaded) / float(num_eps))
+
+            # put together the json onject
+            cur_show_json['next_airdate'] = next_airdate
+            cur_show_json['tvdb_id'] = cur_show.tvdbid
+            cur_show_json['name'] = cur_show.name
+            cur_show_json['network'] = cur_show.network
+            cur_show_json['quality_string'] = quality_string
+            cur_show_json['active'] = not cur_show.paused and cur_show.status != "Ended"
+            cur_show_json['status'] = cur_show.status
+            cur_show_json['num_eps'] = num_eps
+            cur_show_json['num_downloaded'] = num_downloaded
+            cur_show_json['percent_downloaded'] = percent_downloaded
+        
+            result.append(cur_show_json)
+        
+        return json.dumps({'shows': result})
+
+    @cherrypy.expose
     def is_alive(self, *args, **kwargs):
         if 'callback' in kwargs and '_' in kwargs:
             callback, _ = kwargs['callback'], kwargs['_']
@@ -1955,6 +2119,8 @@ class Home:
             return "Error: Unsupported Request. Send jsonp request with 'callback' variable in the query stiring."
         cherrypy.response.headers['Cache-Control'] = "max-age=0,no-cache,no-store"
         cherrypy.response.headers['Content-Type'] = 'text/javascript'
+        cherrypy.response.headers['Access-Control-Allow-Origin'] = '*'
+        cherrypy.response.headers['Access-Control-Allow-Headers'] = 'x-requested-with'
 
         if sickbeard.started:
             return callback+'('+json.dumps({"msg": str(sickbeard.PID)})+');'
@@ -2030,6 +2196,16 @@ class Home:
             return "Boxcar notification succeeded. Check your Boxcar clients to make sure it worked"
         else:
             return "Error sending Boxcar notification"
+
+    @cherrypy.expose
+    def testPushover(self, userKey=None):
+        cherrypy.response.headers['Cache-Control'] = "max-age=0,no-cache,no-store"
+
+        result = notifiers.pushover_notifier.test_notify(userKey)
+        if result:
+            return "Pushover notification succeeded. Check your Pushover clients to make sure it worked"
+        else:
+            return "Error sending Pushover notification"
 
     @cherrypy.expose
     def twitterStep1(self):
@@ -2187,7 +2363,7 @@ class Home:
         )
 
         sqlResults = myDB.select(
-            "SELECT * FROM tv_episodes WHERE showid = ? ORDER BY season*1000+episode DESC",
+            "SELECT * FROM tv_episodes WHERE showid = ? ORDER BY season DESC, episode DESC",
             [showObj.tvdbid]
         )
 
@@ -2630,13 +2806,13 @@ class WebInterface:
             default_image_name = 'banner.png'
 
         default_image_path = ek.ek(os.path.join, sickbeard.PROG_DIR, 'data', 'images', default_image_name)
-        if show == None:
-            return cherrypy.lib.static.serve_file(default_image_path, content_type="image/jpeg")
+        if show is None:
+            return cherrypy.lib.static.serve_file(default_image_path, content_type="image/png")
         else:
             showObj = sickbeard.helpers.findCertainShow(sickbeard.showList, int(show))
 
-        if showObj == None:
-            return cherrypy.lib.static.serve_file(default_image_path, content_type="image/jpeg")
+        if showObj is None:
+            return cherrypy.lib.static.serve_file(default_image_path, content_type="image/png")
 
         cache_obj = image_cache.ImageCache()
         
@@ -2657,7 +2833,7 @@ class WebInterface:
                 if im.mode == 'P': # Convert GIFs to RGB
                     im = im.convert('RGB')
                 if which == 'banner':
-                    size = 600, 112
+                    size = 606, 112
                 elif which == 'poster':
                     size = 136, 200
                 else:
@@ -2668,7 +2844,7 @@ class WebInterface:
                 cherrypy.response.headers['Content-Type'] = 'image/jpeg'
                 return buffer.getvalue()
         else:
-            return cherrypy.lib.static.serve_file(default_image_path, content_type="image/jpeg")
+            return cherrypy.lib.static.serve_file(default_image_path, content_type="image/png")
 
     @cherrypy.expose
     def setComingEpsLayout(self, layout):
@@ -2694,6 +2870,76 @@ class WebInterface:
         sickbeard.COMING_EPS_SORT = sort
         
         redirect("/comingEpisodes")
+
+    @cherrypy.expose
+    def json_coming_eps_list(self, _=None):
+
+        results = []
+
+        myDB = db.DBConnection()
+
+        today = datetime.date.today().toordinal()
+        next_week = (datetime.date.today() + datetime.timedelta(days=7)).toordinal()
+        recently = (datetime.date.today() - datetime.timedelta(days=3)).toordinal()
+
+        done_show_list = []
+        qualList = Quality.DOWNLOADED + Quality.SNATCHED + [ARCHIVED, IGNORED]
+        sql_results = myDB.select("SELECT *, tv_shows.status as show_status FROM tv_episodes, tv_shows WHERE season != 0 AND airdate >= ? AND airdate < ? AND tv_shows.tvdb_id = tv_episodes.showid AND tv_episodes.status NOT IN ("+','.join(['?']*len(qualList))+")", [today, next_week] + qualList)
+        for cur_result in sql_results:
+            done_show_list.append(int(cur_result["showid"]))
+
+        more_sql_results = myDB.select("SELECT *, tv_shows.status as show_status FROM tv_episodes outer_eps, tv_shows WHERE season != 0 AND showid NOT IN ("+','.join(['?']*len(done_show_list))+") AND tv_shows.tvdb_id = outer_eps.showid AND airdate = (SELECT airdate FROM tv_episodes inner_eps WHERE inner_eps.showid = outer_eps.showid AND inner_eps.airdate >= ? ORDER BY inner_eps.airdate ASC LIMIT 1) AND outer_eps.status NOT IN ("+','.join(['?']*len(Quality.DOWNLOADED+Quality.SNATCHED))+")", done_show_list + [next_week] + Quality.DOWNLOADED + Quality.SNATCHED)
+        sql_results += more_sql_results
+
+        more_sql_results = myDB.select("SELECT *, tv_shows.status as show_status FROM tv_episodes, tv_shows WHERE season != 0 AND tv_shows.tvdb_id = tv_episodes.showid AND airdate < ? AND airdate >= ? AND tv_episodes.status = ? AND tv_episodes.status NOT IN ("+','.join(['?']*len(qualList))+")", [today, recently, WANTED] + qualList)
+        sql_results += more_sql_results
+
+        sorts = {
+            'date': (lambda x, y: cmp(int(x["airdate"]), int(y["airdate"]))),
+            'show': (lambda a, b: cmp(a["show_name"], b["show_name"])),
+            'network': (lambda a, b: cmp(a["network"], b["network"])),
+        }
+
+        sql_results.sort(sorts[sickbeard.COMING_EPS_SORT])
+
+        for cur_result in sql_results:
+            
+            if not sickbeard.COMING_EPS_DISPLAY_PAUSED and bool(int(cur_result["paused"])):
+                continue
+            
+            cur_json_obj = {}
+            
+            # make a string out of the quality
+            if int(cur_result["quality"]) in qualityPresets:
+                quality_string = qualityPresetStrings[(cur_result["quality"])]
+            else:
+                quality_string = "Custom"
+
+            if int(cur_result["airdate"]) < today:
+                status = "past"
+            elif int(cur_result["airdate"]) == today:
+                status = "current"
+            elif int(cur_result["airdate"]) < next_week:
+                status = "future"
+            else:
+                status = "distant"
+
+            cur_json_obj['show_name'] = cur_result["show_name"]
+            cur_json_obj['air_date'] = str(datetime.date.fromordinal(int(cur_result["airdate"])))
+            cur_json_obj['tvdb_id'] = cur_result["showid"]
+            cur_json_obj['paused'] = cur_result["paused"]
+            cur_json_obj['ep_string'] = "%2ix%02i" % (int(cur_result["season"]), int(cur_result["episode"]))
+            cur_json_obj['season'] = cur_result["season"]
+            cur_json_obj['episode'] = cur_result["episode"]
+            cur_json_obj['ep_name'] = cur_result["name"]
+            cur_json_obj['ep_description'] = cur_result["description"]
+            cur_json_obj['network'] = cur_result["network"]
+            cur_json_obj['quality_string'] = quality_string
+            cur_json_obj['status'] = status
+
+            results.append(cur_json_obj)
+
+        return json.dumps({"episodes": results})
 
     @cherrypy.expose
     def comingEpisodes(self, layout="None"):
