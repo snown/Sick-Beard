@@ -18,10 +18,7 @@
 
 from __future__ import with_statement
 
-
-import binascii
 import traceback
-
 
 import sickbeard
 
@@ -118,8 +115,8 @@ class ShowQueue(generic_queue.GenericQueue):
 
         return queueItemObj
 
-    def addShow(self, tvdb_id, showDir, default_status=None, quality=None, season_folders=None, lang="en"):
-        queueItemObj = QueueItemAdd(tvdb_id, showDir, default_status, quality, season_folders, lang)
+    def addShow(self, tvdb_id, showDir, default_status=None, quality=None, flatten_folders=None, lang="en"):
+        queueItemObj = QueueItemAdd(tvdb_id, showDir, default_status, quality, flatten_folders, lang)
         
         self.add_item(queueItemObj)
 
@@ -168,26 +165,19 @@ class ShowQueueItem(generic_queue.QueueItem):
 
 
 class QueueItemAdd(ShowQueueItem):
-    def __init__(self, tvdb_id, showDir, default_status, quality, season_folders, lang):
+    def __init__(self, tvdb_id, showDir, default_status, quality, flatten_folders, lang):
 
         self.tvdb_id = tvdb_id
         self.showDir = showDir
         self.default_status = default_status
         self.quality = quality
-        self.season_folders = season_folders
+        self.flatten_folders = flatten_folders
         self.lang = lang
 
         self.show = None
 
         # this will initialize self.show to None
         ShowQueueItem.__init__(self, ShowQueueActions.ADD, self.show)
-
-    def createCRC(self):
-        
-        obj_string = ":".join([str(x) for x in [self.tvdb_id, self.showDir, self.quality]])
-        if self.show:
-            obj_string += ":" + self.show.createCRC()
-        return "%08x" % (binascii.crc32(obj_string) & 0xffffffff)
         
     def _getName(self):
         """
@@ -252,7 +242,7 @@ class QueueItemAdd(ShowQueueItem):
             # set up initial values
             self.show.location = self.showDir
             self.show.quality = self.quality if self.quality else sickbeard.QUALITY_DEFAULT
-            self.show.seasonfolders = self.season_folders if self.season_folders != None else sickbeard.SEASON_FOLDERS_DEFAULT
+            self.show.flatten_folders = self.flatten_folders if self.flatten_folders != None else sickbeard.FLATTEN_FOLDERS_DEFAULT
             self.show.paused = False
             
             # be smartish about this
@@ -347,6 +337,7 @@ class QueueItemRefresh(ShowQueueItem):
 
         self.inProgress = False
 
+
 class QueueItemRename(ShowQueueItem):
     def __init__(self, show=None):
         ShowQueueItem.__init__(self, ShowQueueActions.RENAME, show)
@@ -355,11 +346,38 @@ class QueueItemRename(ShowQueueItem):
 
         ShowQueueItem.execute(self)
 
-        logger.log(u"Performing rename on "+self.show.name)
+        logger.log(u"Performing rename on " + self.show.name)
 
-        self.show.fixEpisodeNames()
+        try:
+            show_loc = self.show.location
+        except exceptions.ShowDirNotFoundException:
+            logger.log(u"Can't perform rename on " + self.show.name + " when the show dir is missing.", logger.WARNING)
+            return
+
+        ep_obj_rename_list = []
+
+        ep_obj_list = self.show.getAllEpisodes(has_location=True)
+        for cur_ep_obj in ep_obj_list:
+            # Only want to rename if we have a location
+            if cur_ep_obj.location:
+                if cur_ep_obj.relatedEps:
+                    # do we have one of multi-episodes in the rename list already
+                    have_already = False
+                    for cur_related_ep in cur_ep_obj.relatedEps + [cur_ep_obj]:
+                        if cur_related_ep in ep_obj_rename_list:
+                            have_already = True
+                            break
+                    if not have_already:
+                        ep_obj_rename_list.append(cur_ep_obj)
+
+                else:
+                    ep_obj_rename_list.append(cur_ep_obj)
+
+        for cur_ep_obj in ep_obj_rename_list:
+            cur_ep_obj.rename()
 
         self.inProgress = False
+
 
 class QueueItemUpdate(ShowQueueItem):
     def __init__(self, show=None):

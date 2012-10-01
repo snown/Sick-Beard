@@ -45,42 +45,12 @@ $(document).ready(function() {
         $('#tableDiv').html('<img id="searchingAnim" src="'+sbRoot+'/images/loading32.gif" height="32" width="32" /> loading folders...');
         $.get(sbRoot+'/home/addShows/massAddTable', url, function(data) {
             $('#tableDiv').html(data);
-            $("#addRootDirTable").dataTable({
-            	
-        		// disable most stuff for the table
-                "bPaginate": false,
-                "bInfo": false,
-                "bFilter": false,
-                "bAutoWidth": false,
-                "bProcessing": false,
-
-        		// only show the basic DOM elements
-        		"sDom": "lftipr",
-                "bJQueryUI": true,
-                
-                "aoColumnDefs": [
-                	{ "sClass": "center", "aTargets": [0] },
-
-        			// checkbox
-                    {
-        				"bSortable": false,
-        				"bSearchable": false,
-        				"aTargets": [0],
-                    },
-                    
-        			// path
-                    {
-                    	"sType": "titles",
-                    	"aTargets": [ 1 ]
-                    },
-                    
-        			// TVDB link
-                    {
-                    	"sType": "link-text",
-                    	"aTargets": [ 2 ]
-                    },
-                    
-            	],
+            $("#addRootDirTable").tablesorter({
+                //sortList: [[1,0]],
+                widgets: ['zebra'],
+                headers: {
+                    0: { sorter: false }
+                }
             });
         });
 
@@ -94,7 +64,7 @@ $(document).ready(function() {
             last_txt = $('#rootDirText').val();
         $('#rootDirStaticList').html('');           
         $('#rootDirs option').each(function(i, w) {
-            $('#rootDirStaticList').append('<li class="ui-state-default ui-corner-all"><input type="checkbox" class="dir_check" id="'+$(w).val()+'" checked=checked> <label for="'+$(w).val()+'">'+$(w).val()+'</label></li>')
+            $('#rootDirStaticList').append('<li class="ui-state-default ui-corner-all"><input type="checkbox" class="cb dir_check" id="'+$(w).val()+'" checked=checked> <label for="'+$(w).val()+'"><b>'+$(w).val()+'</b></label></li>')
         });
         loadContent();
     });
